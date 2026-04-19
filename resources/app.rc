@@ -1,0 +1,14 @@
+#include "resource.h"
+#include <windows.h>
+
+// App icon (shown in Explorer, taskbar, Alt+Tab)
+IDI_APPICON ICON "logo.ico"
+
+// Mouse image for the config popup
+IDR_MOUSE_PNG RCDATA "mouse.png"
+
+STRINGTABLE
+BEGIN
+    1 "Live Haptics"
+    2 "MX Master 4 Haptic Controller"
+END
