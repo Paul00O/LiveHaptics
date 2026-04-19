@@ -1,6 +1,8 @@
 # Live Haptics
 
-Live Haptics is a Windows system tray application that adds customizable haptic feedback to your Logitech mouse (such as the MX Master 4). By directly communicating with the mouse via the HID++ protocol, it allows you to configure specific haptic waveforms for various mouse events, creating a more tactile and engaging user experience.
+Vibe coded Live Haptics with Claude Code. It is a Windows system tray application that adds customizable haptic feedback to your Logitech mouse (such as the MX Master 4). By directly communicating with the mouse via the HID++ protocol, it allows you to configure specific haptic waveforms for various mouse events, creating a more tactile user experience.
+
+![LiveHaptics example](resources/example.png)
 
 ## Features
 
@@ -25,24 +27,6 @@ Live Haptics is a Windows system tray application that adds customizable haptic 
 - CMake 3.20 or newer (for building)
 - Visual Studio / MSVC Compiler (for building)
 
-## Building from Source
-
-This project uses CMake and fetches `hidapi` automatically during the configuration step.
-
-1. Clone or download the repository.
-2. Open a terminal/command prompt in the root of the project directory.
-3. Configure the project:
-   ```bat
-   mkdir build
-   cd build
-   cmake ..
-   ```
-4. Build the executable:
-   ```bat
-   cmake --build . --config Release
-   ```
-5. The compiled executable `LiveHaptics.exe` will be located in the `build/Release/` directory.
-
 ## Usage
 
 1. Run `LiveHaptics.exe`.
@@ -53,14 +37,3 @@ This project uses CMake and fetches `hidapi` automatically during the configurat
 3. Click the system tray icon to open the configuration popup.
 4. Toggle different features on/off, select the desired haptic waveform, and adjust the delay to suit your preference.
 5. Settings are automatically saved to your `AppData/Roaming/LiveHaptics/config.ini` file.
-
-## Technical Details
-
-- **Language**: C++17
-- **UI Framework**: Raw Win32 API and GDI+ (for custom drawn, anti-aliased UI components).
-- **Communication**: Direct HID communication using `hidapi` and the Logitech HID++ 2.0 protocol.
-- **Accessibility Integration**: Leverages `UIAutomation` and `MSAA` APIs to detect interactive UI elements for the hover haptic feature.
-
-## License
-
-This project is intended for personal or professional use. Please review the included source code for any specific dependencies and their respective licenses (e.g., `hidapi`).
