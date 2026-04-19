@@ -1,24 +1,23 @@
 # 🖱️ Live Haptics ✨
 
-Vibe coded Live Haptics with Claude Code. It is a Windows system tray application that adds customizable haptic feedback to your Logitech mouse (such as the MX Master 4). By directly communicating with the mouse via the HID++ protocol, it allows you to configure specific haptic waveforms for various mouse events, creating a more tactile user experience.
+Vibe coded Live Haptics with Claude Code. It is a Windows system tray application that adds customizable haptic feedback to your MX Master 4. By directly communicating with the mouse via the HID++ protocol, it allows you to configure specific haptic waveforms for various mouse events, creating a more tactile user experience.
 
 ![LiveHaptics example](resources/example.png)
 
 ## Features
 
-- **Custom Haptic Waveforms**: Choose from a variety of haptic effects (Click, Snap, Knock, Pulse, etc.) for different mouse actions.
+- **Custom Haptic Waveforms**: Choose from a variety of haptic effects for different mouse actions.
 - **Event Support**: Configure haptics independently for:
-  - Vertical Scroll
+  - Vertical Scroll & Click
   - Side/Thumb Scroll
   - Left Click
   - Right Click
-  - Side Buttons (Forward/Back)
+  - Side Buttons (Forward/Back/Third one)
   - Hover (UI elements, window controls)
 - **Granular Control**: Adjust the delay (cooldown) between haptic events to prevent overwhelming feedback.
-- **Hover Detection**: Utilizes UIAutomation and MSAA to detect when the cursor hovers over interactive elements (buttons, links, text fields) and provides tactile feedback.
+- **Hover Detection**: Detect when the cursor hovers over interactive elements (buttons, links, text fields) and provides tactile feedback.
 - **System Tray Integration**: Runs quietly in the background with a clean, dark-mode popup interface for quick adjustments.
 - **Battery Monitoring**: View your mouse's battery percentage directly from the system tray icon or the configuration popup.
-- **Automatic Device Discovery**: Seamlessly detects and connects to your Logitech device via Bolt or Unifying receivers.
 
 ## Requirements
 
