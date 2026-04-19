@@ -1,4 +1,4 @@
-# Live Haptics
+# 🖱️ Live Haptics ✨
 
 Vibe coded Live Haptics with Claude Code. It is a Windows system tray application that adds customizable haptic feedback to your Logitech mouse (such as the MX Master 4). By directly communicating with the mouse via the HID++ protocol, it allows you to configure specific haptic waveforms for various mouse events, creating a more tactile user experience.
 
