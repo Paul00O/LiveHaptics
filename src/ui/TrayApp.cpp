@@ -54,7 +54,7 @@ LRESULT CALLBACK TrayApp::MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 }
 
 // ─── Tray icon ────────────────────────────────────────────────────────────────
-HICON TrayApp::createDynamicIcon(bool connected, int battery) {
+HICON TrayApp::createDynamicIcon(bool connected, int battery, bool charging) {
     const int SZ = 32;
 
     BITMAPINFO bmi     = {};
@@ -89,12 +89,14 @@ HICON TrayApp::createDynamicIcon(bool connected, int battery) {
 
         Gdiplus::Color dotClr;
         if (connected) {
-            if (battery >= 0 && battery <= 10)
-                dotClr = Gdiplus::Color(255, 255, 69, 58);
+            if (charging)
+                dotClr = Gdiplus::Color(255, 255, 193, 7);   // amber = charging
+            else if (battery >= 0 && battery <= 10)
+                dotClr = Gdiplus::Color(255, 255, 69, 58);   // red = critical
             else
-                dotClr = Gdiplus::Color(255, 48, 209, 88);
+                dotClr = Gdiplus::Color(255, 48, 209, 88);   // green = normal
         } else {
-            dotClr = Gdiplus::Color(220, 120, 120, 120);
+            dotClr = Gdiplus::Color(220, 120, 120, 120);     // gray = disconnected
         }
         Gdiplus::SolidBrush shadow(Gdiplus::Color(100, 0, 0, 0));
         go.FillEllipse(&shadow, Gdiplus::RectF(SZ - 9.5f, SZ - 9.5f, 9.f, 9.f));
@@ -268,8 +270,8 @@ bool TrayApp::init(HINSTANCE hInst) {
         PostMessageW(m_msgWnd, WM_CONNECTED, connected ? 1 : 0,
                      reinterpret_cast<LPARAM>(pName));
     });
-    m_ctrl->setBatteryCallback([this](int pct) {
-        PostMessageW(m_msgWnd, WM_BATTERY, static_cast<WPARAM>(pct), 0);
+    m_ctrl->setBatteryCallback([this](int pct, bool charging) {
+        PostMessageW(m_msgWnd, WM_BATTERY, static_cast<WPARAM>(pct), charging ? 1 : 0);
     });
 
     createTrayIcon();
@@ -300,7 +302,7 @@ void TrayApp::createTrayIcon() {
     m_nid.uID              = TRAY_ICON_ID;
     m_nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
     m_nid.uCallbackMessage = WM_TRAY_MSG;
-    m_nid.hIcon            = createDynamicIcon(false, -1);
+    m_nid.hIcon            = createDynamicIcon(false, -1, false);
     wcscpy_s(m_nid.szTip, L"Live Haptics");
     Shell_NotifyIconW(NIM_ADD, &m_nid);
 
@@ -317,14 +319,18 @@ void TrayApp::removeTrayIcon() {
 
 void TrayApp::updateTrayIcon() {
     if (m_nid.hIcon) DestroyIcon(m_nid.hIcon);
-    m_nid.hIcon  = createDynamicIcon(m_connected, m_battery);
+    m_nid.hIcon  = createDynamicIcon(m_connected, m_battery, m_charging);
     m_nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
 
     if (m_connected) {
-        if (m_battery >= 0)
-            swprintf_s(m_nid.szTip, L"Live Haptics \u2022 %s \u2022 %d%%",
-                       m_devName.c_str(), m_battery);
-        else
+        if (m_battery >= 0) {
+            if (m_charging)
+                swprintf_s(m_nid.szTip, L"Live Haptics \u2022 %s \u2022 %d%% \u26a1",
+                           m_devName.c_str(), m_battery);
+            else
+                swprintf_s(m_nid.szTip, L"Live Haptics \u2022 %s \u2022 %d%%",
+                           m_devName.c_str(), m_battery);
+        } else
             swprintf_s(m_nid.szTip, L"Live Haptics \u2022 %s", m_devName.c_str());
     } else {
         wcscpy_s(m_nid.szTip, L"Live Haptics");
@@ -354,7 +360,7 @@ void TrayApp::showPopup() {
         GetCursorPos(&anchor);
 
     m_popup->setConnected(m_connected, m_devName);
-    m_popup->setBattery(m_battery);
+    m_popup->setBattery(m_battery, m_charging);
     m_popup->setHapticsSupported(m_ctrl && m_ctrl->supportsHaptics());
     m_popup->show(anchor);
 }
@@ -383,10 +389,11 @@ void TrayApp::onConnected(bool connected, const std::wstring& name) {
     }
 }
 
-void TrayApp::onBattery(int pct) {
-    m_battery = pct;
+void TrayApp::onBattery(int pct, bool charging) {
+    m_battery  = pct;
+    m_charging = charging;
     updateTrayIcon();
-    if (m_popup->isVisible()) m_popup->setBattery(pct);
+    if (m_popup->isVisible()) m_popup->setBattery(pct, charging);
 }
 
 // ─── WndProc ──────────────────────────────────────────────────────────────────
@@ -438,7 +445,7 @@ LRESULT TrayApp::handleMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
 
     case WM_BATTERY:
-        onBattery(static_cast<int>(wp));
+        onBattery(static_cast<int>(wp), lp != 0);
         return 0;
 
     case WM_DESTROY:

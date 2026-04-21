@@ -402,9 +402,17 @@ void HapticController::managerThreadFn() {
                         m_sideButtonPending.store(true, std::memory_order_relaxed);
                         m_cv.notify_one();
                     });
+                    // Wire real-time battery notifications from the device so that
+                    // plugging/unplugging the charger is reflected immediately.
+                    m_device.setBatteryCallback([this](int pct, bool charging) {
+                        m_batteryPct.store(pct);
+                        m_isCharging.store(charging);
+                        if (m_onBattery) m_onBattery(pct, charging);
+                    });
                     m_device.startNotifications();
                     if (m_onConnect) m_onConnect(true, m_device.deviceName());
-                    if (m_onBattery && m_device.batteryPct() >= 0) m_onBattery(m_device.batteryPct());
+                    if (m_onBattery && m_device.batteryPct() >= 0)
+                        m_onBattery(m_device.batteryPct(), m_device.isCharging());
                     m_device.playHaptic(Waveform::Knock);
                 }
                 lastBatTick = static_cast<int64_t>(GetTickCount64());
@@ -419,7 +427,8 @@ void HapticController::managerThreadFn() {
         if (nowTick - lastBatTick >= 60000LL) {
             if (m_device.refreshBattery()) {
                 m_batteryPct = m_device.batteryPct();
-                if (m_onBattery) m_onBattery(m_batteryPct);
+                m_isCharging.store(m_device.isCharging());
+                if (m_onBattery) m_onBattery(m_batteryPct, m_device.isCharging());
             }
             lastBatTick = static_cast<int64_t>(GetTickCount64());
         }

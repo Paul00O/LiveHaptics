@@ -133,6 +133,10 @@ public:
 
     std::wstring deviceName() const { return m_deviceName; }
     int          batteryPct()  const { return m_batteryPct; }
+    bool         isCharging()  const { return m_isCharging; }
+
+    using BatteryNotifyCallback = std::function<void(int pct, bool charging)>;
+    void setBatteryCallback(BatteryNotifyCallback cb) { m_batteryNotifyCb = std::move(cb); }
 
     // Feature discovery
     bool     hasFeature(uint16_t featureId) const;
@@ -192,9 +196,12 @@ private:
     uint8_t                     m_thumbWheelFeatureIdx = 0;
     uint8_t                     m_reprogCtrlFeatureIdx = 0;
     std::vector<uint16_t>       m_divertedCIDs;     // CIDs diverted for gesture detection
+    BatteryNotifyCallback       m_batteryNotifyCb;
+    uint8_t                     m_batteryNotifyFeatureIdx = 0;
     std::string                 m_path;
     std::wstring                m_deviceName;
     int                         m_batteryPct        = -1;
+    bool                        m_isCharging        = false;
     std::map<uint16_t, uint8_t> m_featureMap;       // featureId -> index
     uint8_t                     m_devIdx            = DEVICE_INDEX_WIRED;
     uint8_t                     m_hapticFeatureIdx  = 0; // resolved at connect

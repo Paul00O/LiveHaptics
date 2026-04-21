@@ -205,7 +205,11 @@ void PopupWindow::setConnected(bool c, const std::wstring& name) {
     m_deviceName = name.empty() ? L"MX Master 4" : name;
     invalidate();
 }
-void PopupWindow::setBattery(int pct) { m_batteryPct = pct; invalidate(); }
+void PopupWindow::setBattery(int pct, bool charging) {
+    m_batteryPct  = pct;
+    m_isCharging  = charging;
+    invalidate();
+}
 
 // ─── WndProc ─────────────────────────────────────────────────────────────────
 LRESULT CALLBACK PopupWindow::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -869,20 +873,40 @@ void PopupWindow::drawHeader(Graphics& g) {
 
     // Battery widget — right-aligned, vertically centered in header
     if (m_connected && m_batteryPct >= 0) {
-        COLORREF bc = m_batteryPct>20 ? Colors::STATUS_OK :
-                      m_batteryPct>10 ? Colors::STATUS_WARN : Colors::STATUS_ERR;
+        // Color: amber when charging, green/yellow/red based on level otherwise
+        COLORREF bc = m_isCharging        ? Colors::STATUS_CHARGE :
+                      m_batteryPct > 20   ? Colors::STATUS_OK     :
+                      m_batteryPct > 10   ? Colors::STATUS_WARN   : Colors::STATUS_ERR;
+
         constexpr float BW=27.6f, BH=13.8f, NW=3.45f, NH=6.9f;
         float bx = float(POPUP_W) - 22.f - NW - BW - 43.f;
         float by = (float(HEADER_H) - BH) / 2.f + 4.f;
-        wchar_t bs[8]; swprintf_s(bs, L"%d%%", m_batteryPct);
-        Pen bp(toGdi(bc,170),1.f); drawRoundRectStroke(g,RectF(bx,by,BW,BH),3.45f,bp);
-        SolidBrush nub(toGdi(bc,150)); drawRoundRect(g,RectF(bx+BW,by+(BH-NH)/2.f,NW,NH),1.75f,nub);
+
+        // Battery shell
+        Pen bp(toGdi(bc,170),1.f);
+        drawRoundRectStroke(g,RectF(bx,by,BW,BH),3.45f,bp);
+        SolidBrush nub(toGdi(bc,150));
+        drawRoundRect(g,RectF(bx+BW,by+(BH-NH)/2.f,NW,NH),1.75f,nub);
+
+        // Fill bar
         float fw = std::max(2.3f,(float(m_batteryPct)/100.f)*(BW-4.6f));
-        LinearGradientBrush fill(PointF(bx+2.3f,by+2.3f),PointF(bx+2.3f,by+BH-2.3f),toGdi(bc,235),toGdi(bc,175));
+        LinearGradientBrush fill(PointF(bx+2.3f,by+2.3f),PointF(bx+2.3f,by+BH-2.3f),
+                                 toGdi(bc,235),toGdi(bc,175));
         drawRoundRect(g,RectF(bx+2.3f,by+2.3f,fw,BH-4.6f),2.3f,fill);
-        Font bf(L"Segoe UI",10.35f,FontStyleBold); SolidBrush bt(toGdi(bc,205));
-        StringFormat sfR2; sfR2.SetAlignment(StringAlignmentNear); sfR2.SetLineAlignment(StringAlignmentCenter);
-        g.DrawString(bs,-1,&bf,RectF(bx+BW+NW+4.f,by+0.f,39.f,BH),&sfR2,&bt);
+
+        // Label: "⚡ 75%" when charging, "75%" otherwise
+        wchar_t bs[16];
+        if (m_isCharging)
+            swprintf_s(bs, L"\u26a1 %d%%", m_batteryPct);
+        else
+            swprintf_s(bs, L"%d%%", m_batteryPct);
+
+        Font bf(L"Segoe UI",10.35f,FontStyleBold);
+        SolidBrush bt(toGdi(bc,220));
+        StringFormat sfR2;
+        sfR2.SetAlignment(StringAlignmentNear);
+        sfR2.SetLineAlignment(StringAlignmentCenter);
+        g.DrawString(bs,-1,&bf,RectF(bx+BW+NW+4.f,by,52.f,BH),&sfR2,&bt);
     }
 
     // Separator

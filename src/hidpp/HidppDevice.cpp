@@ -181,22 +181,32 @@ bool HidppDevice::fetchDeviceName(uint8_t devIdx) {
 }
 
 bool HidppDevice::fetchBattery(uint8_t devIdx) {
-    // 0x1004 BATTERY_UNIFIED:
-    //   func 0x00 = getCapabilities (NOT the level)
-    //   func 0x01 = getBatteryLevelStatus → param(0) = percentage 0-100
+    // BATTERY_UNIFIED (0x1004) — preferred, gives exact percentage + charging state
+    //   func 0x01 = getStatus → param[0]=level(0-100), param[1]=nextLevel,
+    //                            param[2]=batteryStatus, param[3]=externalPower
+    //   batteryStatus: 0=discharging 1=recharging 2=almost_full 3=full 4=slow_charge
+    //   externalPower: 0=not_present 1=present (cable plugged in)
     auto it = m_featureMap.find(FeatureId::BATTERY_UNIFIED);
     if (it != m_featureMap.end()) {
         auto r = request(it->second, 0x01, {}, devIdx);
         if (r && r->bytes.size() > 5 && r->param(0) <= 100) {
             m_batteryPct = r->param(0);
+            uint8_t status   = r->param(2);  // battery charge status
+            uint8_t external = r->param(3);  // 1 = charging cable present
+            m_isCharging = (external == 1) || (status >= 1 && status <= 4);
             return true;
         }
     }
+    // BATTERY_STATUS (0x1000) — legacy fallback
+    //   func 0x00 = getBatteryLevelStatus → param[0]=level, param[2]=status
+    //   status: 0=discharging 1=recharging 2=charge_complete
     it = m_featureMap.find(FeatureId::BATTERY_STATUS);
     if (it != m_featureMap.end()) {
         auto r = request(it->second, 0x00, {}, devIdx);
         if (r && r->bytes.size() > 5 && r->param(0) <= 100) {
             m_batteryPct = r->param(0);
+            uint8_t status = r->param(2);
+            m_isCharging = (status == 1 || status == 2);
             return true;
         }
     }
@@ -265,16 +275,28 @@ void HidppDevice::startNotifications() {
         }
     }
 
+    // ── Battery change notifications (BATTERY_UNIFIED 0x1004) ───────────────────
+    // Device sends spontaneous HID++ events when battery level or charging state
+    // changes (e.g., charger plugged in). SW_ID=0 identifies spontaneous packets.
+    m_batteryNotifyFeatureIdx = 0;
+    {
+        auto batIt = m_featureMap.find(FeatureId::BATTERY_UNIFIED);
+        if (batIt != m_featureMap.end())
+            m_batteryNotifyFeatureIdx = batIt->second;
+    }
+
     // Need at least one notification source to justify opening the handle
-    if (m_thumbWheelFeatureIdx == 0 && m_reprogCtrlFeatureIdx == 0)
+    if (m_thumbWheelFeatureIdx == 0 && m_reprogCtrlFeatureIdx == 0
+            && m_batteryNotifyFeatureIdx == 0)
         return;
 
     // Open a second independent handle to the same long-report endpoint.
     // On Windows, each HID file handle has its own read queue — both handles
     // receive full copies of all incoming packets from the device.
     if (!m_hidNotify.open(m_path)) {
-        m_thumbWheelFeatureIdx = 0;
-        m_reprogCtrlFeatureIdx = 0;
+        m_thumbWheelFeatureIdx    = 0;
+        m_reprogCtrlFeatureIdx    = 0;
+        m_batteryNotifyFeatureIdx = 0;
         return;
     }
 
@@ -341,6 +363,28 @@ void HidppDevice::notificationThreadFn() {
             }
             continue;
         }
+
+        // ── Battery level / charge-state change (BATTERY_UNIFIED 0x1004) ──────
+        // Device sends this spontaneously when battery level changes or when the
+        // charging cable is plugged/unplugged. SW_ID=0 distinguishes these events
+        // from responses to our own requests.
+        //   buf[4] = level (0-100)
+        //   buf[5] = nextLevel
+        //   buf[6] = batteryStatus (0=discharging 1=recharging 2=almost_full 3=full)
+        //   buf[7] = externalPower (0=no cable 1=cable present)
+        if (m_batteryNotifyFeatureIdx != 0 && buf[2] == m_batteryNotifyFeatureIdx) {
+            if ((buf[3] & 0x0F) == 0 && buf.size() >= 8) {
+                uint8_t level    = buf[4];
+                uint8_t status   = buf[6];
+                uint8_t external = buf[7];
+                if (level <= 100) {
+                    m_batteryPct = level;
+                    m_isCharging = (external == 1) || (status >= 1 && status <= 4);
+                    if (m_batteryNotifyCb) m_batteryNotifyCb(m_batteryPct, m_isCharging);
+                }
+            }
+            continue;
+        }
     }
 }
 
@@ -348,10 +392,12 @@ void HidppDevice::disconnect() {
     stopNotifications();
     m_hid.close();
     m_hidShort.close();
-    m_connected        = false;
+    m_connected               = false;
     m_featureMap.clear();
-    m_batteryPct       = -1;
-    m_hapticFeatureIdx = 0;
+    m_batteryPct              = -1;
+    m_isCharging              = false;
+    m_batteryNotifyFeatureIdx = 0;
+    m_hapticFeatureIdx        = 0;
 }
 
 bool HidppDevice::isConnected() const { return m_connected && m_hid.isOpen(); }
@@ -367,6 +413,17 @@ std::optional<Packet> HidppDevice::request(uint8_t featIdx, uint8_t func,
                                              int timeoutMs,
                                              int maxAttempts) {
     if (!m_hid.isOpen()) return std::nullopt;
+
+    // Drain stale input reports that accumulated in m_hid's private read queue.
+    // Windows delivers copies of every incoming HID++ packet to all open file
+    // handles for the same endpoint — including m_hid even though the notification
+    // thread already consumed the same packets from m_hidNotify. Without this flush
+    // the read loop below reads old thumb-wheel / gesture events instead of our
+    // response, causing the request to silently time out.
+    {
+        std::vector<uint8_t> stale;
+        while (m_hid.read(stale, 0) && !stale.empty()) {}
+    }
 
     auto pkt = Packet::makeLong(devIdx, featIdx, func, params);
     if (!m_hid.write(pkt.bytes)) return std::nullopt;

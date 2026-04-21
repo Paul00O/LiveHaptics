@@ -65,7 +65,7 @@ public:
     ~HapticController();
 
     using ConnectCallback = std::function<void(bool connected, const std::wstring& name)>;
-    using BatteryCallback = std::function<void(int pct)>;
+    using BatteryCallback = std::function<void(int pct, bool charging)>;
 
     void setConnectCallback(ConnectCallback cb) { m_onConnect = std::move(cb); }
     void setBatteryCallback(BatteryCallback cb) { m_onBattery = std::move(cb); }
@@ -76,6 +76,7 @@ public:
     bool         isConnected()        const { return m_connected.load(); }
     std::wstring deviceName()         const;
     int          batteryPct()         const { return m_batteryPct.load(); }
+    bool         isCharging()         const { return m_isCharging.load(); }
     bool         supportsHaptics()    const { return m_hapticsSupported.load(); }
     bool         supportsThumbWheel() const { return m_device.supportsThumbWheel(); }
 
@@ -106,6 +107,7 @@ private:
     std::atomic<bool>  m_connected       {false};
     std::atomic<bool>  m_hapticsSupported{false};
     std::atomic<int>   m_batteryPct      {-1};
+    std::atomic<bool>  m_isCharging      {false};
 
     mutable std::mutex       m_nameMutex;
     std::wstring             m_deviceName;

@@ -30,13 +30,13 @@ private:
     void createTrayIcon();
     void removeTrayIcon();
     void updateTrayIcon();
-    HICON createDynamicIcon(bool connected, int battery);
+    HICON createDynamicIcon(bool connected, int battery, bool charging);
 
     void showPopup();
     void showContextMenu();
 
     void onConnected(bool connected, const std::wstring& name);
-    void onBattery(int pct);
+    void onBattery(int pct, bool charging);
 
     HINSTANCE   m_hInst     = nullptr;
     HWND        m_msgWnd    = nullptr;
@@ -48,6 +48,7 @@ private:
 
     bool        m_connected  = false;
     int         m_battery    = -1;
+    bool        m_charging   = false;
     std::wstring m_devName;
 
     // Low-level mouse hook for scroll haptic

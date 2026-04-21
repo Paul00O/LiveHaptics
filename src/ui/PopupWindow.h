@@ -14,9 +14,10 @@ namespace Colors {
     constexpr COLORREF BG_SURFACE = 0x1C1818;
     constexpr COLORREF TEXT_MAIN  = 0xF7F5F5;
     constexpr COLORREF TEXT_DIM   = 0x908C8C;
-    constexpr COLORREF STATUS_OK  = 0x6FC926;
-    constexpr COLORREF STATUS_WARN= 0x0ADBFF;
-    constexpr COLORREF STATUS_ERR = 0x3A45FF;
+    constexpr COLORREF STATUS_OK     = 0x6FC926;
+    constexpr COLORREF STATUS_WARN   = 0x0ADBFF;
+    constexpr COLORREF STATUS_ERR    = 0x3A45FF;
+    constexpr COLORREF STATUS_CHARGE = 0x07C1FF;  // amber: R=255 G=193 B=7
 }
 
 inline Gdiplus::Color toGdi(COLORREF cr, BYTE alpha = 255) {
@@ -51,7 +52,7 @@ public:
     HWND hwnd() const { return m_hwnd; }
 
     void setConnected(bool connected, const std::wstring& name);
-    void setBattery(int pct);
+    void setBattery(int pct, bool charging);
     void setHapticsSupported(bool s) { m_hapticsSupported = s; }
 
     // Setters — 0=Scroll,1=SideScroll,2=L.Click,3=R.Click,4=SideButtons,5=ScrollClick,6=Hover
@@ -159,6 +160,7 @@ private:
     bool         m_hapticsSupported = false;
     std::wstring m_deviceName;
     int          m_batteryPct       = -1;
+    bool         m_isCharging       = false;
 
     int                m_activeType   = -1; // -1 = none
     int                m_displayType  =  0; // shown in panel while animating closed
